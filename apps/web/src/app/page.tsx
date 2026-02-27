@@ -34,12 +34,20 @@ export default async function Home() {
           </ol>
 
           <div className="mt-5">
-            <a
-              href="/tenant/rbac"
-              className="inline-flex items-center rounded-md bg-indigo-700 px-3 py-2 text-sm font-medium text-white"
-            >
-              RBAC Console&apos;a Git
-            </a>
+            <div className="flex flex-wrap gap-2">
+              <a
+                href="/tenant/rbac"
+                className="inline-flex items-center rounded-md bg-indigo-700 px-3 py-2 text-sm font-medium text-white"
+              >
+                RBAC Console&apos;a Git
+              </a>
+              <a
+                href="/tenant/organization/branches"
+                className="inline-flex items-center rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white"
+              >
+                Branch Management&apos;a Git
+              </a>
+            </div>
           </div>
         </section>
       </div>
