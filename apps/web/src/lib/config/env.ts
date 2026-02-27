@@ -1,4 +1,4 @@
-type RequiredClientEnv = "NEXT_PUBLIC_SUPABASE_URL" | "NEXT_PUBLIC_SUPABASE_ANON_KEY";
+type RequiredClientEnv = "NEXT_PUBLIC_SUPABASE_URL";
 
 function readClientEnv(key: RequiredClientEnv): string {
   const value = process.env[key];
@@ -12,7 +12,14 @@ function readClientEnv(key: RequiredClientEnv): string {
 
 export const env = {
   supabaseUrl: readClientEnv("NEXT_PUBLIC_SUPABASE_URL"),
-  supabaseAnonKey: readClientEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
+  supabaseAnonKey:
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ||
+    (() => {
+      throw new Error(
+        "Missing required env var: NEXT_PUBLIC_SUPABASE_ANON_KEY or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY",
+      );
+    })(),
   platformAdminDomain: process.env.PLATFORM_ADMIN_DOMAIN || "admin.alpi360.com",
   platformTenantRootDomain: process.env.PLATFORM_TENANT_ROOT_DOMAIN || "alpi360.com",
 };
