@@ -15,6 +15,10 @@ function readWithFallback(request: NextRequest, headerKey: string, queryKey: str
   return request.headers.get(headerKey)?.trim() || request.nextUrl.searchParams.get(queryKey)?.trim() || "";
 }
 
+function isDebugFallbackEnabled() {
+  return process.env.ALPI_ALLOW_DEBUG_ACTOR_FALLBACK === "true";
+}
+
 async function getActorFromSession(tenantId: string): Promise<RequestActor | null> {
   const supabaseServer = await createServerClient();
   const {
@@ -68,7 +72,7 @@ function getActorFromDebugFallback(request: NextRequest): RequestActor {
     throw new ApiError(
       401,
       "ALPI-PERM-VAL-041",
-      "Missing actor role context. Use authenticated session or provide x-role-id for bootstrap mode.",
+      "Missing actor role context. Use authenticated session or provide x-role-id for debug fallback mode.",
     );
   }
 
@@ -87,5 +91,9 @@ export async function getRequestActor(request: NextRequest, tenantId: string): P
     return fromSession;
   }
 
-  return getActorFromDebugFallback(request);
+  if (isDebugFallbackEnabled()) {
+    return getActorFromDebugFallback(request);
+  }
+
+  throw new ApiError(401, "ALPI-PERM-AUTH-099", "Authentication required. Debug actor fallback is disabled.");
 }
