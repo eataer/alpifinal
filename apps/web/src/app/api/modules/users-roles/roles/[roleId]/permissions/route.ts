@@ -49,6 +49,68 @@ function validatePayload(payload: Partial<ManagePayload>): ManagePayload {
   return { items: normalized };
 }
 
+export async function GET(request: NextRequest, { params }: { params: Promise<{ roleId: string }> }) {
+  try {
+    const tenant = await getTenantFromRequest(request);
+    const actor = await getRequestActor(request, tenant.id);
+
+    await assertFeatureEnabled(tenant, "users_roles");
+    await assertPermissionAndScope({
+      tenantId: tenant.id,
+      roleId: actor.roleId,
+      permissionKey: "role_permissions.view",
+      actorPrimaryBranchId: actor.primaryBranchId,
+      actorAssignedBranchIds: actor.assignedBranchIds,
+    });
+
+    const { roleId } = await params;
+    const supabase = createAdminClient();
+
+    const { data: role, error: roleError } = await supabase
+      .from("roles")
+      .select("id,tenant_id,name,is_active")
+      .eq("id", roleId)
+      .single();
+
+    if (roleError || !role?.id) {
+      throw new ApiError(404, "ALPI-PERM-NOTF-086", "Role not found.");
+    }
+
+    if (role.tenant_id !== tenant.id) {
+      throw new ApiError(403, "ALPI-PERM-PERM-087", "Cannot view permissions of role from another tenant.");
+    }
+
+    const { data, error } = await supabase
+      .from("role_permissions")
+      .select("scope, permissions:permissions!inner(id,key,resource,action)")
+      .eq("role_id", role.id)
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      throw new ApiError(500, "ALPI-PERM-INT-088", error.message || "Failed to read role permissions.");
+    }
+
+    const items = (data ?? []).map((row) => ({
+      scope: row.scope,
+      permission: Array.isArray(row.permissions) ? row.permissions[0] : row.permissions,
+    }));
+
+    return NextResponse.json({
+      ok: true,
+      role: {
+        id: role.id,
+        name: role.name,
+        isActive: role.is_active,
+      },
+      count: items.length,
+      items,
+    });
+  } catch (error) {
+    const mapped = toErrorResponse(error);
+    return NextResponse.json(mapped.body, { status: mapped.status });
+  }
+}
+
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ roleId: string }> }) {
   try {
     const tenant = await getTenantFromRequest(request);
