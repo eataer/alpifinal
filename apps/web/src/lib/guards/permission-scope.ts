@@ -6,7 +6,8 @@ export type PermissionCheckInput = {
   roleId: string;
   permissionKey: string;
   requestedBranchId?: string | null;
-  actorBranchId?: string | null;
+  actorPrimaryBranchId?: string | null;
+  actorAssignedBranchIds?: string[];
 };
 
 export async function assertPermissionAndScope(input: PermissionCheckInput) {
@@ -59,13 +60,16 @@ export async function assertPermissionAndScope(input: PermissionCheckInput) {
   }
 
   if (scope === "assigned_branch") {
-    const targetBranch = input.requestedBranchId || input.actorBranchId;
+    const fallbackBranch = input.actorPrimaryBranchId || input.actorAssignedBranchIds?.[0] || null;
+    const targetBranch = input.requestedBranchId || fallbackBranch;
 
     if (!targetBranch) {
       throw new ApiError(403, "ALPI-PERM-VAL-046", "Branch-scoped permission requires branch context.");
     }
 
-    if (input.actorBranchId && input.requestedBranchId && input.actorBranchId !== input.requestedBranchId) {
+    const assigned = input.actorAssignedBranchIds ?? [];
+
+    if (assigned.length > 0 && !assigned.includes(targetBranch)) {
       throw new ApiError(403, "ALPI-PERM-PERM-047", "Actor cannot access a different branch scope.");
     }
 

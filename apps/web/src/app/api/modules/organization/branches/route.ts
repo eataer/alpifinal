@@ -10,7 +10,7 @@ import { getTenantFromRequest } from "@/lib/tenant/tenant-context";
 export async function GET(request: NextRequest) {
   try {
     const tenant = await getTenantFromRequest(request);
-    const actor = getRequestActor(request);
+    const actor = await getRequestActor(request, tenant.id);
 
     await assertFeatureEnabled(tenant, "organization");
     const permission = await assertPermissionAndScope({
@@ -18,7 +18,8 @@ export async function GET(request: NextRequest) {
       roleId: actor.roleId,
       permissionKey: "branches.view",
       requestedBranchId: request.nextUrl.searchParams.get("branch_id"),
-      actorBranchId: actor.branchId,
+      actorPrimaryBranchId: actor.primaryBranchId,
+      actorAssignedBranchIds: actor.assignedBranchIds,
     });
 
     const supabase = createAdminClient();
