@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 import { resolveTenantFromHost } from "@/lib/tenant/resolve-tenant";
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const sessionResponse = await updateSession(request);
 
   const { isPlatformAdmin, tenantSubdomain } = resolveTenantFromHost(request.headers.get("host"));
