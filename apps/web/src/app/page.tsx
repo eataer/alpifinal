@@ -32,6 +32,15 @@ export default async function Home() {
             <li>Subscription/feature/permission/scope guard middleware</li>
             <li>RBAC seed roller + role assignment rules</li>
           </ol>
+
+          <div className="mt-5">
+            <a
+              href="/tenant/rbac"
+              className="inline-flex items-center rounded-md bg-indigo-700 px-3 py-2 text-sm font-medium text-white"
+            >
+              RBAC Console&apos;a Git
+            </a>
+          </div>
         </section>
       </div>
     </main>
