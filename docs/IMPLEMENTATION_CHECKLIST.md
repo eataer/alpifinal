@@ -1,19 +1,19 @@
 # Alpi 360 - Uygulama Checklist (Faz Bazlı)
 
 ## Faz 1 - Başlatma
-- [ ] Git repository başlat
-- [ ] GitHub remote bağla
-- [ ] Next.js + TypeScript app kur
-- [ ] Supabase project oluştur
-- [ ] `.env` değerlerini doldur
-- [ ] İlk migrationları çalıştır
-- [ ] RLS + temel politikaları aktive et
-- [ ] Tenant çözümleme middleware iskeleti
-- [ ] RBAC tabloları ve seed
-- [ ] Organization tabloları ve şube otomatik kasa/depo kuralı
+- [x] Git repository başlat
+- [x] GitHub remote bağla
+- [x] Next.js + TypeScript app kur
+- [x] Supabase project oluştur
+- [x] `.env` değerlerini doldur
+- [x] İlk migrationları çalıştır
+- [x] RLS + temel politikaları aktive et
+- [x] Tenant çözümleme middleware iskeleti
+- [x] RBAC tabloları ve seed
+- [x] Organization tabloları ve şube otomatik kasa/depo kuralı
 
 ## Faz 2
-- [ ] HR tabloları
+- [x] HR tabloları
 - [ ] Kategori/marka/ürün tabloları
 - [ ] Ürün import akışı
 

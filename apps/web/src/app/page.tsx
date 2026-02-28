@@ -53,6 +53,12 @@ export default async function Home() {
               >
                 Department Management&apos;a Git
               </a>
+              <a
+                href="/tenant/hr/employees"
+                className="inline-flex items-center rounded-md bg-blue-700 px-3 py-2 text-sm font-medium text-white"
+              >
+                Employees Console&apos;a Git
+              </a>
             </div>
           </div>
         </section>
