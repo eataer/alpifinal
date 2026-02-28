@@ -126,7 +126,7 @@ export default function DepartmentsConsole() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 px-6 py-8 text-slate-900">
+    <div className="space-y-6 text-slate-900">
       <div className="mx-auto max-w-6xl space-y-6">
         <h1 className="text-3xl font-bold">Department Management (Phase 1)</h1>
 
@@ -296,6 +296,6 @@ export default function DepartmentsConsole() {
           </section>
         ) : null}
       </div>
-    </main>
+    </div>
   );
 }

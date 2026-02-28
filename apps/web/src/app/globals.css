@@ -1,26 +1,59 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f3f5f7;
+  --foreground: #1a2438;
+  --card: #ffffff;
+  --muted: #6f7d93;
+  --line: #d7deea;
+  --primary: #0b5fff;
+  --primary-strong: #084dd3;
+  --accent: #00a889;
+  --danger: #c9334e;
+  --ring: rgba(11, 95, 255, 0.18);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: var(--font-plus-jakarta);
+  --font-mono: var(--font-ibm-plex-mono);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-plus-jakarta), sans-serif;
+}
+
+* {
+  border-color: var(--line);
+}
+
+input,
+select,
+textarea,
+button {
+  outline: none;
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+button:focus-visible {
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+.alpi-page-bg {
+  background:
+    radial-gradient(circle at 12% -10%, rgba(11, 95, 255, 0.12) 0%, transparent 42%),
+    radial-gradient(circle at 96% 2%, rgba(0, 168, 137, 0.12) 0%, transparent 40%),
+    var(--background);
+}
+
+.alpi-card {
+  border: 1px solid var(--line);
+  background: var(--card);
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(26, 36, 56, 0.04);
 }
