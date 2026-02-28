@@ -29,6 +29,11 @@ export default function BranchesConsole() {
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
 
+  const [editId, setEditId] = useState<string>("");
+  const [editName, setEditName] = useState("");
+  const [editAddress, setEditAddress] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+
   const [items, setItems] = useState<BranchItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -74,6 +79,53 @@ export default function BranchesConsole() {
       setCode("");
       setAddress("");
       setPhone("");
+
+      await loadBranches();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function saveEdit() {
+    if (!editId) return;
+
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/modules/organization/branches/${editId}?${query}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: editName, address: editAddress, phone: editPhone }),
+      });
+
+      const data = (await res.json()) as { ok: boolean; code?: string; message?: string };
+      if (!data.ok) throw new Error(`${data.code || "ERROR"}: ${data.message || "Request failed"}`);
+
+      setEditId("");
+      setEditName("");
+      setEditAddress("");
+      setEditPhone("");
+
+      await loadBranches();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function deactivateBranch(branchId: string) {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/modules/organization/branches/${branchId}/deactivate?${query}`, {
+        method: "POST",
+      });
+
+      const data = (await res.json()) as { ok: boolean; code?: string; message?: string };
+      if (!data.ok) throw new Error(`${data.code || "ERROR"}: ${data.message || "Request failed"}`);
 
       await loadBranches();
     } catch (e) {
@@ -177,6 +229,7 @@ export default function BranchesConsole() {
                   <th className="py-2">Adres</th>
                   <th className="py-2">Telefon</th>
                   <th className="py-2">Durum</th>
+                  <th className="py-2">Aksiyon</th>
                 </tr>
               </thead>
               <tbody>
@@ -187,12 +240,82 @@ export default function BranchesConsole() {
                     <td className="py-2">{branch.address || "-"}</td>
                     <td className="py-2">{branch.phone || "-"}</td>
                     <td className="py-2">{branch.is_active ? "Aktif" : "Pasif"}</td>
+                    <td className="py-2">
+                      <div className="flex gap-2">
+                        <button
+                          className="rounded border border-slate-300 px-2 py-1"
+                          onClick={() => {
+                            setEditId(branch.id);
+                            setEditName(branch.name);
+                            setEditAddress(branch.address || "");
+                            setEditPhone(branch.phone || "");
+                          }}
+                        >
+                          Düzenle
+                        </button>
+                        <button
+                          className="rounded border border-rose-300 px-2 py-1 text-rose-700"
+                          onClick={() => deactivateBranch(branch.id)}
+                          disabled={!branch.is_active}
+                        >
+                          Pasife Al
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         </section>
+
+        {editId ? (
+          <section className="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
+            <h2 className="mb-3 text-lg font-semibold">Şube Düzenle</h2>
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="text-sm">
+                <div className="mb-1 font-medium">Şube adı</div>
+                <input
+                  className="w-full rounded-md border border-slate-300 px-3 py-2"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                />
+              </label>
+              <label className="text-sm">
+                <div className="mb-1 font-medium">Adres</div>
+                <input
+                  className="w-full rounded-md border border-slate-300 px-3 py-2"
+                  value={editAddress}
+                  onChange={(e) => setEditAddress(e.target.value)}
+                />
+              </label>
+              <label className="text-sm md:col-span-2">
+                <div className="mb-1 font-medium">Telefon</div>
+                <input
+                  className="w-full rounded-md border border-slate-300 px-3 py-2"
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                />
+              </label>
+            </div>
+            <div className="mt-4 flex gap-2">
+              <button className="rounded-md bg-indigo-700 px-3 py-2 text-sm text-white" onClick={saveEdit} disabled={loading}>
+                Kaydet
+              </button>
+              <button
+                className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+                onClick={() => {
+                  setEditId("");
+                  setEditName("");
+                  setEditAddress("");
+                  setEditPhone("");
+                }}
+              >
+                Vazgeç
+              </button>
+            </div>
+          </section>
+        ) : null}
       </div>
     </main>
   );
