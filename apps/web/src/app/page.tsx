@@ -47,6 +47,12 @@ export default async function Home() {
               >
                 Branch Management&apos;a Git
               </a>
+              <a
+                href="/tenant/organization/departments"
+                className="inline-flex items-center rounded-md bg-emerald-700 px-3 py-2 text-sm font-medium text-white"
+              >
+                Department Management&apos;a Git
+              </a>
             </div>
           </div>
         </section>
