@@ -14,7 +14,7 @@
 
 ## Faz 2
 - [x] HR tabloları
-- [ ] Kategori/marka/ürün tabloları
+- [x] Kategori/marka/ürün tabloları
 - [ ] Ürün import akışı
 
 ## Faz 3
