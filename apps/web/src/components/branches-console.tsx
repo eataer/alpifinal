@@ -20,6 +20,12 @@ type BranchApiResponse = {
   items?: BranchItem[];
 };
 
+type DeactivatePreview = {
+  userCount: number;
+  usersWithoutOtherActiveBranch: number;
+  employeeCount: number;
+};
+
 export default function BranchesConsole() {
   const [tenantSubdomain, setTenantSubdomain] = useState("demo");
   const [roleId, setRoleId] = useState("a581c118-66fb-439c-bbb3-1d8d5ed74c3b");
@@ -33,6 +39,14 @@ export default function BranchesConsole() {
   const [editName, setEditName] = useState("");
   const [editAddress, setEditAddress] = useState("");
   const [editPhone, setEditPhone] = useState("");
+
+  const [wizardBranchId, setWizardBranchId] = useState<string>("");
+  const [wizardBranchName, setWizardBranchName] = useState<string>("");
+  const [wizardPreview, setWizardPreview] = useState<DeactivatePreview | null>(null);
+  const [moveUsers, setMoveUsers] = useState(true);
+  const [targetBranchId, setTargetBranchId] = useState("");
+  const [autoSetPrimary, setAutoSetPrimary] = useState(true);
+  const [suspendNoBranch, setSuspendNoBranch] = useState(true);
 
   const [items, setItems] = useState<BranchItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -116,17 +130,57 @@ export default function BranchesConsole() {
     }
   }
 
-  async function deactivateBranch(branchId: string) {
+  async function openDeactivateWizard(branchId: string, branchName: string) {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`/api/modules/organization/branches/${branchId}/deactivate?${query}`, {
+      const res = await fetch(`/api/modules/organization/branches/${branchId}/deactivate?${query}`);
+      const data = (await res.json()) as {
+        ok: boolean;
+        code?: string;
+        message?: string;
+        preview?: DeactivatePreview;
+      };
+
+      if (!data.ok) throw new Error(`${data.code || "ERROR"}: ${data.message || "Request failed"}`);
+
+      setWizardBranchId(branchId);
+      setWizardBranchName(branchName);
+      setWizardPreview(data.preview || null);
+      setMoveUsers(true);
+      setTargetBranchId("");
+      setAutoSetPrimary(true);
+      setSuspendNoBranch(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function executeDeactivateWizard() {
+    if (!wizardBranchId) return;
+
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/modules/organization/branches/${wizardBranchId}/deactivate?${query}`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          moveUsers,
+          targetBranchId: moveUsers ? targetBranchId || undefined : undefined,
+          autoSetPrimaryOnTarget: autoSetPrimary,
+          suspendUsersWithoutActiveBranch: suspendNoBranch,
+        }),
       });
 
       const data = (await res.json()) as { ok: boolean; code?: string; message?: string };
       if (!data.ok) throw new Error(`${data.code || "ERROR"}: ${data.message || "Request failed"}`);
 
+      setWizardBranchId("");
+      setWizardBranchName("");
+      setWizardPreview(null);
       await loadBranches();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unknown error");
@@ -134,6 +188,25 @@ export default function BranchesConsole() {
       setLoading(false);
     }
   }
+
+  async function activateBranch(branchId: string) {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/modules/organization/branches/${branchId}/activate?${query}`, {
+        method: "POST",
+      });
+      const data = (await res.json()) as { ok: boolean; code?: string; message?: string };
+      if (!data.ok) throw new Error(`${data.code || "ERROR"}: ${data.message || "Request failed"}`);
+      await loadBranches();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const activeTargets = items.filter((b) => b.is_active && b.id !== wizardBranchId);
 
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-8 text-slate-900">
@@ -253,13 +326,21 @@ export default function BranchesConsole() {
                         >
                           Düzenle
                         </button>
-                        <button
-                          className="rounded border border-rose-300 px-2 py-1 text-rose-700"
-                          onClick={() => deactivateBranch(branch.id)}
-                          disabled={!branch.is_active}
-                        >
-                          Pasife Al
-                        </button>
+                        {branch.is_active ? (
+                          <button
+                            className="rounded border border-rose-300 px-2 py-1 text-rose-700"
+                            onClick={() => openDeactivateWizard(branch.id, branch.name)}
+                          >
+                            Pasife Al
+                          </button>
+                        ) : (
+                          <button
+                            className="rounded border border-emerald-300 px-2 py-1 text-emerald-700"
+                            onClick={() => activateBranch(branch.id)}
+                          >
+                            Aktif Et
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -312,6 +393,73 @@ export default function BranchesConsole() {
                 }}
               >
                 Vazgeç
+              </button>
+            </div>
+          </section>
+        ) : null}
+
+        {wizardBranchId ? (
+          <section className="rounded-xl border border-rose-200 bg-rose-50 p-4">
+            <h2 className="mb-3 text-lg font-semibold">Şube Pasifleştirme Sihirbazı</h2>
+            <p className="text-sm">Şube: <span className="font-medium">{wizardBranchName}</span></p>
+            <div className="mt-3 grid gap-2 text-sm md:grid-cols-3">
+              <div className="rounded border border-rose-200 bg-white p-2">Kullanıcı: {wizardPreview?.userCount ?? 0}</div>
+              <div className="rounded border border-rose-200 bg-white p-2">Aktif şubesi kalmayacak kullanıcı: {wizardPreview?.usersWithoutOtherActiveBranch ?? 0}</div>
+              <div className="rounded border border-rose-200 bg-white p-2">Personel: {wizardPreview?.employeeCount ?? 0}</div>
+            </div>
+
+            <div className="mt-4 space-y-2 text-sm">
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={moveUsers} onChange={(e) => setMoveUsers(e.target.checked)} />
+                Kullanıcıları hedef şubeye kaydır
+              </label>
+
+              {moveUsers ? (
+                <label className="block">
+                  <div className="mb-1">Hedef şube</div>
+                  <select
+                    className="w-full rounded-md border border-slate-300 px-3 py-2"
+                    value={targetBranchId}
+                    onChange={(e) => setTargetBranchId(e.target.value)}
+                  >
+                    <option value="">Seçiniz</option>
+                    {activeTargets.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name} ({b.code})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={autoSetPrimary} onChange={(e) => setAutoSetPrimary(e.target.checked)} />
+                Primary branch otomatik hedefe taşınsın
+              </label>
+
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={suspendNoBranch} onChange={(e) => setSuspendNoBranch(e.target.checked)} />
+                Aktif şubesi kalmayan kullanıcılar suspended olsun
+              </label>
+            </div>
+
+            <div className="mt-4 flex gap-2">
+              <button
+                className="rounded-md bg-rose-700 px-3 py-2 text-sm text-white"
+                onClick={executeDeactivateWizard}
+                disabled={loading || (moveUsers && !targetBranchId)}
+              >
+                Pasife Al
+              </button>
+              <button
+                className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+                onClick={() => {
+                  setWizardBranchId("");
+                  setWizardBranchName("");
+                  setWizardPreview(null);
+                }}
+              >
+                Kapat
               </button>
             </div>
           </section>
