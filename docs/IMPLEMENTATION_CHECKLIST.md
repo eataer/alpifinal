@@ -15,7 +15,7 @@
 ## Faz 2
 - [x] HR tabloları
 - [x] Kategori/marka/ürün tabloları
-- [ ] Ürün import akışı
+- [x] Ürün import akışı
 
 ## Faz 3
 - [ ] Inventory çekirdeği

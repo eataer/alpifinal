@@ -34,6 +34,21 @@ type Product = {
 
 type TabKey = "categories" | "brands" | "products";
 
+type ProductImportRow = {
+  sku?: string;
+  name?: string;
+  category_name?: string;
+  brand_name?: string;
+  model?: string;
+  barcode?: string;
+  tracking_type?: "none" | "serial" | "imei" | "iccid";
+  sale_price?: number | null;
+  min_sale_price?: number | null;
+  cost_price?: number | null;
+  vat_rate?: number | null;
+  is_active?: boolean;
+};
+
 export default function CatalogConsole() {
   const [tenantSubdomain, setTenantSubdomain] = useState("demo");
   const [roleId, setRoleId] = useState("a581c118-66fb-439c-bbb3-1d8d5ed74c3b");
@@ -71,6 +86,17 @@ export default function CatalogConsole() {
   const [categoryCreateOpen, setCategoryCreateOpen] = useState(false);
   const [brandCreateOpen, setBrandCreateOpen] = useState(false);
   const [productCreateOpen, setProductCreateOpen] = useState(false);
+  const [productImportOpen, setProductImportOpen] = useState(false);
+  const [importMode, setImportMode] = useState<"insert_only" | "upsert_by_sku">("upsert_by_sku");
+  const [createMissingBrands, setCreateMissingBrands] = useState(true);
+  const [importRaw, setImportRaw] = useState("");
+  const [importSummary, setImportSummary] = useState<{
+    total: number;
+    created: number;
+    updated: number;
+    failed: number;
+  } | null>(null);
+  const [importErrors, setImportErrors] = useState<Array<{ row: number; code: string; message: string }>>([]);
 
   const baseQuery = useMemo(() => {
     const p = new URLSearchParams({
@@ -283,6 +309,152 @@ export default function CatalogConsole() {
     }
   }
 
+  function parseMaybeNumber(value: string) {
+    const cleaned = value.trim();
+    if (!cleaned) return null;
+    const parsed = Number(cleaned.replace(",", "."));
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+
+  function parseImportText(raw: string): ProductImportRow[] {
+    const lines = raw
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    if (lines.length < 2) {
+      throw new Error("Import metni en az 1 baslik + 1 veri satiri icermeli.");
+    }
+
+    const headers = lines[0].split("\t").map((h) => h.trim().toLowerCase());
+    const supported = new Set([
+      "sku",
+      "name",
+      "category_name",
+      "brand_name",
+      "model",
+      "barcode",
+      "tracking_type",
+      "sale_price",
+      "min_sale_price",
+      "cost_price",
+      "vat_rate",
+      "is_active",
+    ]);
+
+    headers.forEach((h) => {
+      if (!supported.has(h)) {
+        throw new Error(`Desteklenmeyen kolon: ${h}`);
+      }
+    });
+
+    const rows: ProductImportRow[] = [];
+    for (let i = 1; i < lines.length; i += 1) {
+      const cols = lines[i].split("\t");
+      const row: Record<string, string> = {};
+      headers.forEach((h, idx) => {
+        row[h] = (cols[idx] || "").trim();
+      });
+
+      rows.push({
+        sku: row.sku || undefined,
+        name: row.name || undefined,
+        category_name: row.category_name || undefined,
+        brand_name: row.brand_name || undefined,
+        model: row.model || undefined,
+        barcode: row.barcode || undefined,
+        tracking_type: (row.tracking_type as ProductImportRow["tracking_type"]) || undefined,
+        sale_price: parseMaybeNumber(row.sale_price),
+        min_sale_price: parseMaybeNumber(row.min_sale_price),
+        cost_price: parseMaybeNumber(row.cost_price),
+        vat_rate: parseMaybeNumber(row.vat_rate),
+        is_active: row.is_active ? row.is_active.toLowerCase() === "true" : undefined,
+      });
+    }
+
+    return rows;
+  }
+
+  function downloadImportTemplate() {
+    const header = [
+      "sku",
+      "name",
+      "category_name",
+      "brand_name",
+      "model",
+      "barcode",
+      "tracking_type",
+      "sale_price",
+      "min_sale_price",
+      "cost_price",
+      "vat_rate",
+      "is_active",
+    ].join("\t");
+
+    const sample = [
+      "IP15-128-BLK",
+      "iPhone 15 128GB Siyah",
+      "Akilli Telefon",
+      "Apple",
+      "A3090",
+      "8690000000001",
+      "imei",
+      "62999",
+      "60999",
+      "58500",
+      "20",
+      "true",
+    ].join("\t");
+
+    const content = `${header}\n${sample}\n`;
+    const blob = new Blob([content], { type: "text/tab-separated-values;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "alpi360_products_import_template.tsv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  async function importProducts() {
+    setLoading(true);
+    setError("");
+    setImportSummary(null);
+    setImportErrors([]);
+    try {
+      const rows = parseImportText(importRaw);
+      const res = await fetch(`/api/modules/catalog/products/import?tenant_subdomain=${tenantSubdomain}&role_id=${roleId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: importMode,
+          create_missing_brands: createMissingBrands,
+          rows,
+        }),
+      });
+
+      const data = (await res.json()) as {
+        ok: boolean;
+        code?: string;
+        message?: string;
+        summary?: { total: number; created: number; updated: number; failed: number };
+        errors?: Array<{ row: number; code: string; message: string }>;
+      };
+
+      if (!data.ok) throw new Error(`${data.code || "ERROR"}: ${data.message || "Import failed"}`);
+
+      setImportSummary(data.summary || null);
+      setImportErrors(data.errors || []);
+      await loadAll();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="space-y-5 text-slate-900">
       <section className="alpi-card p-5">
@@ -310,9 +482,14 @@ export default function CatalogConsole() {
               </button>
             ) : null}
             {activeTab === "products" ? (
-              <button className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white" onClick={() => setProductCreateOpen(true)}>
-                Yeni Urun
-              </button>
+              <>
+                <button className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100" onClick={() => setProductImportOpen(true)}>
+                  Toplu Ice Aktar
+                </button>
+                <button className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white" onClick={() => setProductCreateOpen(true)}>
+                  Yeni Urun
+                </button>
+              </>
             ) : null}
           </div>
         </div>
@@ -655,6 +832,77 @@ export default function CatalogConsole() {
               </button>
               <button className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50" disabled={loading || !productName.trim() || !productSku.trim() || !productCategoryId} onClick={createProduct}>
                 Kaydet
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {productImportOpen ? (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 px-4">
+          <div className="w-full max-w-5xl rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold">Urun Toplu Ice Aktar</h2>
+                <p className="mt-1 text-sm text-slate-600">Excel/Sheets verisini TSV olarak kopyalayip asagiya yapistir. Basliklar zorunludur.</p>
+              </div>
+              <button className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100" onClick={downloadImportTemplate}>
+                Sablon Indir
+              </button>
+            </div>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <label className="text-sm">
+                <div className="mb-1 font-medium">Import modu</div>
+                <select className="w-full rounded-lg border border-slate-300 px-3 py-2" value={importMode} onChange={(e) => setImportMode(e.target.value as typeof importMode)}>
+                  <option value="upsert_by_sku">Var olani guncelle + yeniyi ekle</option>
+                  <option value="insert_only">Sadece yeni ekle</option>
+                </select>
+              </label>
+              <label className="inline-flex items-center gap-2 self-end text-sm">
+                <input type="checkbox" checked={createMissingBrands} onChange={(e) => setCreateMissingBrands(e.target.checked)} />
+                Marka yoksa olustur
+              </label>
+            </div>
+
+            <div className="mt-4">
+              <textarea
+                className="h-56 w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-xs"
+                placeholder={
+                  "sku\tname\tcategory_name\tbrand_name\tmodel\tbarcode\ttracking_type\tsale_price\tmin_sale_price\tcost_price\tvat_rate\tis_active\nIP15-128-BLK\tiPhone 15 128GB Siyah\tAkilli Telefon\tApple\tA3090\t8690000000001\timei\t62999\t60999\t58500\t20\ttrue"
+                }
+                value={importRaw}
+                onChange={(e) => setImportRaw(e.target.value)}
+              />
+            </div>
+
+            {importSummary ? (
+              <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+                Toplam: {importSummary.total} | Olusan: {importSummary.created} | Guncellenen: {importSummary.updated} | Hatali: {importSummary.failed}
+              </div>
+            ) : null}
+
+            {importErrors.length > 0 ? (
+              <div className="mt-3 max-h-40 overflow-auto rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">
+                {importErrors.slice(0, 20).map((er) => (
+                  <div key={`${er.row}-${er.code}`}>
+                    Satir {er.row}: {er.code} - {er.message}
+                  </div>
+                ))}
+                {importErrors.length > 20 ? <div className="mt-1">... +{importErrors.length - 20} satir daha</div> : null}
+              </div>
+            ) : null}
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button className="rounded-lg border border-slate-300 px-3 py-2 text-sm" onClick={() => setProductImportOpen(false)}>
+                Kapat
+              </button>
+              <button
+                className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                disabled={loading || !importRaw.trim()}
+                onClick={importProducts}
+              >
+                Ice Aktar
               </button>
             </div>
           </div>
